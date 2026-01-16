@@ -42,6 +42,11 @@ Python library + CLI for optimizing DJ playlists using Google OR-Tools CP-SAT so
 - **Commits**: Conventional Commits (feat, fix, docs, etc.) enforced by pre-commit.
 - **Tests**: Pure `pytest` class-based structure. **NO fixtures**, **NO conftest.py**. Data instantiated inline.
 
+## USER PREFERENCES
+- **Testing**: Maintain high coverage (~90%). Mock external dependencies (DB/filesystem) heavily. Avoid shared fixtures in favor of inline instantiation for clarity.
+- **Integration**: Prioritize safer XML export over direct DB writes, but maintain the DB write capability for advanced users.
+- **Style**: Strict linting (ruff, pre-commit) is mandatory. No unused variables or complex nested contexts.
+
 ## ANTI-PATTERNS (THIS PROJECT)
 - ❌ **Print**: Forbidden in library code (`src/`). Use `logging`. Allowed ONLY in `cli.py`.
 - ❌ **Suppression**: No `# type: ignore` or `# noqa`.
