@@ -5,122 +5,70 @@
 **Branch:** main
 
 ## OVERVIEW
-
-Python library + CLI for optimizing DJ playlists using Google OR-Tools CP-SAT solver. Harmonic mixing (Camelot Wheel) + BPM matching (direct/halftime/doubletime) with constraint programming.
+Python library + CLI for optimizing DJ playlists using Google OR-Tools CP-SAT solver. Features harmonic mixing (Camelot Wheel), BPM matching (direct/halftime/doubletime), and Rekordbox integration (DB/XML).
 
 ## STRUCTURE
-
 ```
 .
-├── src/dj_playlist_optimizer/   # Core library (7 modules)
-│   ├── __init__.py              # Public API exports
-│   ├── models.py                # Track, PlaylistResult, statistics
-│   ├── optimizer.py             # CP-SAT solver logic
-│   ├── bpm.py                   # BPM compatibility (halftime/double)
-│   ├── camelot.py               # Camelot wheel harmonic rules
-│   └── cli.py                   # dj-optimize command
-├── tests/                       # pytest suite (53 tests, 0 fixtures)
-├── examples/                    # SDK + CLI usage demos
-└── pyproject.toml               # uv-managed, PEP 621
+├── src/dj_playlist_optimizer/   # Core logic (solver, models, integrations)
+├── tests/                       # Unit + integration tests (pure pytest, no fixtures)
+├── examples/                    # Usage demos (SDK + logging)
+└── pyproject.toml               # uv-managed dependencies + tool config
 ```
 
 ## WHERE TO LOOK
-
 | Task | Location | Notes |
 |------|----------|-------|
-| Add BPM logic | `src/dj_playlist_optimizer/bpm.py` | Pure functions, no state |
-| Modify harmonic rules | `src/dj_playlist_optimizer/camelot.py` | Circular distance calculations |
-| Change solver objective | `src/dj_playlist_optimizer/optimizer.py:113` | `model.maximize(sum(included))` |
-| Add CLI flags | `src/dj_playlist_optimizer/cli.py:84-150` | argparse setup |
-| New constraints | `src/dj_playlist_optimizer/optimizer.py:66-111` | Before `model.solve()` |
-| Edge creation logic | `src/dj_playlist_optimizer/optimizer.py:71-80` | BPM filter for graph edges |
+| **Core Solver** | `src/dj_playlist_optimizer/optimizer.py` | Uses `AddCircuit` constraint for TSP-like pathfinding |
+| **Data Models** | `src/dj_playlist_optimizer/models.py` | `Track`, `PlaylistResult`, `HarmonicLevel` |
+| **BPM Logic** | `src/dj_playlist_optimizer/bpm.py` | Pure functions for BPM compatibility |
+| **Harmonic Rules** | `src/dj_playlist_optimizer/camelot.py` | Camelot Wheel math + `KEY_MAPPING` |
+| **Rekordbox** | `src/dj_playlist_optimizer/rekordbox.py` | Direct DB read/write + XML export |
+| **CLI** | `src/dj_playlist_optimizer/cli.py` | `argparse` entry point + logging setup |
+
+## CODE MAP
+| Symbol | Type | Location | Role |
+|--------|------|----------|------|
+| `PlaylistOptimizer` | Class | `optimizer.py` | Main facade for configuring and running the solver |
+| `Track` | Class | `models.py` | Data carrier for ID, Key, BPM, Energy, Duration |
+| `HarmonicLevel` | Enum | `models.py` | STRICT, MODERATE, RELAXED compatibility modes |
+| `RekordboxLoader` | Class | `rekordbox.py` | Interface for reading playlists from `master.db` |
+| `write_rekordbox_xml` | Func | `rekordbox.py` | Generates XML for re-importing optimized lists |
 
 ## CONVENTIONS
-
-**Deviations from Python standard**:
-- Uses `src/` layout (prevents accidental imports)
-- `uv` package manager instead of pip/poetry
-- No `tests/__init__.py` (pytest doesn't require it)
-- Line length: 100 chars (not 79/88)
-- Double quotes enforced by ruff
-
-**BPM Compatibility**:
-- Direct match: `|bpm1 - bpm2| <= tolerance`
-- Halftime: `|bpm1 - bpm2/2| <= tolerance` (e.g., 128↔64)
-- Doubletime: `|bpm1 - bpm2*2| <= tolerance` (e.g., 75↔150)
-
-**Harmonic Levels**:
-- `STRICT`: Same key, ±1 hour (same letter), or same hour (diff letter)
-- `MODERATE`: STRICT + ±1 hour (diff letter)
-- `RELAXED`: MODERATE + ±3 hours
-
-**Commit Messages**:
-- Enforced conventional commits via pre-commit hook
-- Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`
+- **Layout**: `src/` layout with `uv` package manager.
+- **Line Length**: **100 chars** (enforced by ruff).
+- **Quotes**: Double quotes always.
+- **Commits**: Conventional Commits (feat, fix, docs, etc.) enforced by pre-commit.
+- **Tests**: Pure `pytest` class-based structure. **NO fixtures**, **NO conftest.py**. Data instantiated inline.
 
 ## ANTI-PATTERNS (THIS PROJECT)
-
-**Forbidden**:
-- ❌ `print()` in library code (`src/dj_playlist_optimizer/*.py` except `cli.py`)
-- ❌ Use `logging` module instead
-- ❌ Type suppression (`type: ignore`, `# noqa`)
-- ❌ Modifying `PlaylistStatistics.total_input_tracks` after init (design smell)
-
-**Clean codebase**: Zero `TODO`, `FIXME`, `HACK`, or `DEPRECATED` markers found.
+- ❌ **Print**: Forbidden in library code (`src/`). Use `logging`. Allowed ONLY in `cli.py`.
+- ❌ **Suppression**: No `# type: ignore` or `# noqa`.
+- ❌ **Mutable State**: Do not modify `PlaylistStatistics` fields after init.
+- ❌ **Direct DB Write**: Avoid writing to Rekordbox DB while the app is open (corruption risk).
 
 ## UNIQUE STYLES
-
-**Solver Pattern**:
-- Uses `AddCircuit` constraint (traveling salesman variant)
-- Self-loops (`i → i`) represent excluded tracks
-- Soft constraint: max non-harmonic transitions via `max_violations`
-
-**No pytest fixtures**: Tests instantiate data inline (no `conftest.py`).
-
-**Class-based tests**: `TestBpmCompatible`, `TestParseCamelotKey`, etc.
-
-**Version hardcoded**: `cli.py:150` has `version="0.1.0"` (not pulled from pyproject.toml).
+- **Solver**: Uses a "dummy node" pattern in `AddCircuit` to find longest paths (TSP variant).
+- **Soft Constraints**: "Must Include" logic implemented via massive objective weights (100,000).
+- **Versioning**: Hybrid approach. `pyproject.toml` (1.0.0) vs `cli.py` fallback (0.0.0).
 
 ## COMMANDS
-
 ```bash
-# Setup
+# Dev Cycle
 uv sync --dev
-uv run pre-commit install
-uv run pre-commit install --hook-type commit-msg
-
-# Development
-uv run pytest                    # Run tests (53 pass)
-uv run ruff check --fix          # Lint + auto-fix
-uv run ruff format               # Format code
+uv run pytest
+uv run ruff check --fix && uv run ruff format
 uv run pre-commit run --all-files
 
-# CLI
-uv run dj-optimize tracks.json
-uv run dj-optimize tracks.json -v              # INFO logging
-uv run dj-optimize tracks.json -vv             # DEBUG logging
-uv run dj-optimize tracks.json --bpm-tolerance 8 --harmonic-level moderate
-
-# Examples
-uv run python examples/sdk_usage.py
-uv run python examples/logging_example.py
+# CLI Usage
+uv run dj-optimize tracks.json --harmonic-level moderate
+uv run dj-optimize --rekordbox --playlist "Techno" --output result.xml
+uv run dj-optimize --rekordbox --playlist "Techno" --write-to-db
 ```
 
 ## NOTES
-
-**Gotchas**:
-- Camelot wheel is circular: `1A` and `12A` are adjacent (distance = 1, not 11)
-- BPM compatibility is asymmetric due to halftime: `bpm_compatible(128, 64) == True` but context matters
-- Empty playlist result if no BPM-compatible edges exist (check `edge_vars`)
-- Solver may timeout on large inputs (default 60s limit)
-- Pre-commit hook blocks invalid commit messages (use `git commit --no-verify` to bypass, but don't)
-
-**Missing (by design)**:
-- No GitHub Actions / remote CI (local pre-commit only)
-- No LICENSE file
-- No `docs/` directory (README-only documentation)
-- Module state coupling: `PlaylistStatistics.total_input_tracks` set externally
-
-**Dependencies**:
-- Runtime: `ortools >= 9.8.3296`
-- Dev: `pytest`, `ruff`, `pre-commit`
+- **Camelot Math**: `1A` and `12A` are adjacent. Code handles circular distance.
+- **Halftime BPM**: `128` matches `64`. Asymmetric relationship supported.
+- **DB Write Risk**: Direct write requires Rekordbox to be closed to avoid SQLite lock errors.
+- **Missing**: No `docs/` dir (README only). No remote CI (local pre-commit only).
