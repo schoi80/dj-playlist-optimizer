@@ -165,6 +165,11 @@ uv sync --dev
 # Run tests
 uv run pytest
 
+# Lint and format
+uv run ruff check          # Check for issues
+uv run ruff check --fix    # Auto-fix issues
+uv run ruff format         # Format code
+
 # Run example
 uv run python examples/sdk_usage.py
 ```
