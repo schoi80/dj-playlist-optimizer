@@ -3,6 +3,7 @@ name = "djkr8"
 version = "1.4.0"
 description = "DJ playlist optimizer using Google OR-Tools for harmonic mixing and BPM matching"
 readme = "README.md"
+license = { file = "LICENSE" }
 authors = [
     { name = "Sage Choi", email = "sage.choi@gmail.com" }
 ]
@@ -11,6 +12,10 @@ dependencies = [
     "ortools>=9.8.3296",
     "pyrekordbox>=0.1.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/schoi80/djkr8"
+Repository = "https://github.com/schoi80/djkr8"
 
 [project.scripts]
 djkr8 = "djkr8.cli:main"
