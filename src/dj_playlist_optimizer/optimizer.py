@@ -1,5 +1,7 @@
 """Playlist optimization using Google OR-Tools CP-SAT solver."""
 
+import logging
+
 from ortools.sat.python import cp_model
 
 from dj_playlist_optimizer.models import (
@@ -11,6 +13,8 @@ from dj_playlist_optimizer.models import (
 )
 from dj_playlist_optimizer.bpm import bpm_compatible, get_bpm_difference
 from dj_playlist_optimizer.camelot import is_harmonic_compatible
+
+logger = logging.getLogger(__name__)
 
 
 class PlaylistOptimizer:
@@ -46,10 +50,17 @@ class PlaylistOptimizer:
         Returns:
             PlaylistResult with the optimized playlist
         """
+        logger.info(f"Starting optimization with {len(tracks)} tracks")
+        logger.debug(
+            f"Config: bpm_tolerance={self.bpm_tolerance}, harmonic_level={self.harmonic_level.value}"
+        )
+
         if not tracks:
+            logger.warning("No tracks provided for optimization")
             return PlaylistResult(playlist=[], solver_status="empty_input")
 
         if len(tracks) == 1:
+            logger.info("Single track input, returning trivial result")
             return PlaylistResult(
                 playlist=tracks,
                 solver_status="single_track",
@@ -78,6 +89,10 @@ class PlaylistOptimizer:
                     self.allow_halftime_bpm,
                 ):
                     edge_vars[(i, j)] = model.new_bool_var(f"edge_{i}_{j}")
+
+        logger.debug(
+            f"Created {len(edge_vars)} BPM-compatible edges out of {n * (n - 1)} possible"
+        )
 
         arcs = [(i, j, var) for (i, j), var in edge_vars.items()]
 
@@ -109,20 +124,36 @@ class PlaylistOptimizer:
         if violation_vars:
             max_violations = max(1, int(n * self.max_violation_pct))
             model.add(sum(violation_vars.values()) <= max_violations)
+            logger.debug(
+                f"Found {len(violation_vars)} non-harmonic edges, max allowed: {max_violations}"
+            )
 
         model.maximize(sum(included))
 
+        logger.info("Starting CP-SAT solver")
         solver = cp_model.CpSolver()
         solver.parameters.max_time_in_seconds = self.time_limit_seconds
         solver.parameters.log_search_progress = False
 
         status = solver.solve(model)
 
+        logger.info(
+            f"Solver finished: {solver.status_name(status)} in {solver.wall_time:.2f}s"
+        )
+
         if status in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
-            return self._extract_result(
+            result = self._extract_result(
                 solver, tracks, included, edge_vars, violation_vars, status
             )
+            if result.statistics:
+                logger.info(
+                    f"Optimized playlist: {result.statistics.playlist_length}/{len(tracks)} tracks "
+                    f"({result.statistics.coverage_pct:.1f}% coverage), "
+                    f"{result.statistics.harmonic_pct:.1f}% harmonic transitions"
+                )
+            return result
         else:
+            logger.warning(f"No solution found: {solver.status_name(status)}")
             return PlaylistResult(
                 playlist=[],
                 solver_status=solver.status_name(status),
@@ -142,6 +173,8 @@ class PlaylistOptimizer:
         n = len(tracks)
 
         selected_indices = [i for i in range(n) if solver.value(included[i])]
+
+        logger.debug(f"Selected {len(selected_indices)} tracks from solution")
 
         if not selected_indices:
             return PlaylistResult(playlist=[], solver_status="no_solution")

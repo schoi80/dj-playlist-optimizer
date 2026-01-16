@@ -1,5 +1,9 @@
 """BPM compatibility checking with halftime/doubletime support."""
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 def bpm_compatible(
     bpm1: float, bpm2: float, tolerance: float = 10.0, allow_halftime: bool = True

@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import logging
 import sys
 from pathlib import Path
 
@@ -11,9 +12,12 @@ from dj_playlist_optimizer import (
     Track,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def load_tracks_from_json(filepath: Path) -> list[Track]:
     """Load tracks from JSON file."""
+    logger.debug(f"Loading tracks from {filepath}")
     with open(filepath) as f:
         data = json.load(f)
 
@@ -40,11 +44,13 @@ def load_tracks_from_json(filepath: Path) -> list[Track]:
             )
         )
 
+    logger.info(f"Loaded {len(tracks)} tracks from {filepath}")
     return tracks
 
 
 def save_result_to_json(result, filepath: Path):
     """Save optimization result to JSON file."""
+    logger.debug(f"Saving results to {filepath}")
     output = {
         "playlist": [{"id": t.id, "key": t.key, "bpm": t.bpm} for t in result.playlist],
         "transitions": [
@@ -79,6 +85,8 @@ def save_result_to_json(result, filepath: Path):
 
     with open(filepath, "w") as f:
         json.dump(output, f, indent=2)
+
+    logger.info(f"Results saved to {filepath}")
 
 
 def main():
@@ -147,13 +155,34 @@ Examples:
         help="Solver time limit in seconds (default: 60)",
     )
 
+    parser.add_argument(
+        "--verbose",
+        "-v",
+        action="count",
+        default=0,
+        help="Increase verbosity (-v for INFO, -vv for DEBUG)",
+    )
+
     parser.add_argument("--version", action="version", version="%(prog)s 0.1.0")
 
     args = parser.parse_args()
 
+    if args.verbose == 0:
+        log_level = logging.WARNING
+    elif args.verbose == 1:
+        log_level = logging.INFO
+    else:
+        log_level = logging.DEBUG
+
+    logging.basicConfig(
+        level=log_level,
+        format="%(levelname)s: %(message)s",
+    )
+
     try:
         tracks = load_tracks_from_json(args.input)
     except Exception as e:
+        logger.error(f"Failed to load tracks: {e}")
         print(f"Error loading tracks: {e}", file=sys.stderr)
         return 1
 

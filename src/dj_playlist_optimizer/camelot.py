@@ -1,6 +1,10 @@
 """Camelot wheel harmonic compatibility checking."""
 
+import logging
+
 from dj_playlist_optimizer.models import HarmonicLevel
+
+logger = logging.getLogger(__name__)
 
 
 def parse_camelot_key(key: str) -> tuple[int, str]:
@@ -25,6 +29,7 @@ def parse_camelot_key(key: str) -> tuple[int, str]:
     key = key.strip().upper()
 
     if len(key) < 2:
+        logger.warning(f"Invalid Camelot key format: '{key}'")
         raise ValueError(f"Invalid Camelot key: '{key}'")
 
     letter = key[-1]

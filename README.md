@@ -60,6 +60,10 @@ dj-optimize tracks.json --bpm-tolerance 8 --harmonic-level moderate
 
 # Save results to JSON
 dj-optimize tracks.json --output result.json
+
+# Enable verbose logging
+dj-optimize tracks.json -v          # INFO level
+dj-optimize tracks.json -vv         # DEBUG level
 ```
 
 ## Input Format
@@ -123,6 +127,30 @@ Maximize playlist length while keeping non-harmonic transitions below the thresh
 See `examples/` directory:
 - `example_tracks.json` - Sample input data
 - `sdk_usage.py` - SDK usage demonstration
+- `logging_example.py` - Logging configuration example
+
+## Logging
+
+The library uses Python's standard `logging` module. Configure logging to see detailed information about the optimization process:
+
+```python
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+```
+
+Log levels:
+- `WARNING` (default): Errors and warnings only
+- `INFO`: Optimization progress, statistics, and results
+- `DEBUG`: Detailed solver information, edge counts, and configuration
+
+CLI verbosity:
+- No flag: WARNING level
+- `-v`: INFO level
+- `-vv`: DEBUG level
 
 ## Development
 
