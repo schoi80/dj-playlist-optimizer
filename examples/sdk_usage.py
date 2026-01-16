@@ -1,9 +1,9 @@
 """SDK usage example for DJ Playlist Optimizer."""
 
 from dj_playlist_optimizer import (
+    HarmonicLevel,
     PlaylistOptimizer,
     Track,
-    HarmonicLevel,
 )
 
 
@@ -38,7 +38,7 @@ def main():
 
     if result.statistics:
         stats = result.statistics
-        print(f"\n📊 Statistics:")
+        print("\n📊 Statistics:")
         print(
             f"  Coverage: {stats.playlist_length}/{stats.total_input_tracks} tracks ({stats.coverage_pct:.1f}%)"
         )
@@ -49,12 +49,12 @@ def main():
             f"  BPM range: {stats.bpm_range[0]:.0f}-{stats.bpm_range[1]:.0f} (avg: {stats.avg_bpm:.1f})"
         )
 
-    print(f"\n🎵 Playlist order:")
+    print("\n🎵 Playlist order:")
     for i, track in enumerate(result.playlist, 1):
         print(f"  {i:2d}. {track.id:12s} | {track.key:4s} | {track.bpm:6.1f} BPM")
 
     if result.transitions:
-        print(f"\n🔗 Transitions:")
+        print("\n🔗 Transitions:")
         for t in result.transitions:
             harmonic_symbol = "✓" if t.is_harmonic else "⚠️ "
             print(

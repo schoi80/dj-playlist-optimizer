@@ -4,6 +4,8 @@ import logging
 
 from ortools.sat.python import cp_model
 
+from dj_playlist_optimizer.bpm import bpm_compatible, get_bpm_difference
+from dj_playlist_optimizer.camelot import is_harmonic_compatible
 from dj_playlist_optimizer.models import (
     HarmonicLevel,
     PlaylistResult,
@@ -11,8 +13,6 @@ from dj_playlist_optimizer.models import (
     Track,
     TransitionInfo,
 )
-from dj_playlist_optimizer.bpm import bpm_compatible, get_bpm_difference
-from dj_playlist_optimizer.camelot import is_harmonic_compatible
 
 logger = logging.getLogger(__name__)
 
@@ -90,9 +90,7 @@ class PlaylistOptimizer:
                 ):
                     edge_vars[(i, j)] = model.new_bool_var(f"edge_{i}_{j}")
 
-        logger.debug(
-            f"Created {len(edge_vars)} BPM-compatible edges out of {n * (n - 1)} possible"
-        )
+        logger.debug(f"Created {len(edge_vars)} BPM-compatible edges out of {n * (n - 1)} possible")
 
         arcs = [(i, j, var) for (i, j), var in edge_vars.items()]
 
@@ -110,9 +108,7 @@ class PlaylistOptimizer:
 
         violation_vars = {}
         for (i, j), edge_var in edge_vars.items():
-            if not is_harmonic_compatible(
-                tracks[i].key, tracks[j].key, self.harmonic_level
-            ):
+            if not is_harmonic_compatible(tracks[i].key, tracks[j].key, self.harmonic_level):
                 violation = model.new_bool_var(f"viol_{i}_{j}")
                 model.add(edge_var == 1).only_enforce_if(violation)
                 model.add(edge_var == 0).only_enforce_if(violation.Not())
@@ -137,9 +133,7 @@ class PlaylistOptimizer:
 
         status = solver.solve(model)
 
-        logger.info(
-            f"Solver finished: {solver.status_name(status)} in {solver.wall_time:.2f}s"
-        )
+        logger.info(f"Solver finished: {solver.status_name(status)} in {solver.wall_time:.2f}s")
 
         if status in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
             result = self._extract_result(
@@ -180,9 +174,7 @@ class PlaylistOptimizer:
             return PlaylistResult(playlist=[], solver_status="no_solution")
 
         selected_edges = {
-            (i, j): solver.value(var)
-            for (i, j), var in edge_vars.items()
-            if solver.value(var) == 1
+            (i, j): solver.value(var) for (i, j), var in edge_vars.items() if solver.value(var) == 1
         }
 
         if not selected_edges:
@@ -221,9 +213,7 @@ class PlaylistOptimizer:
             solver_time_seconds=solver.wall_time,
         )
 
-    def _reconstruct_path(
-        self, tracks, selected_edges, selected_indices, violation_vars, solver
-    ):
+    def _reconstruct_path(self, tracks, selected_edges, selected_indices, violation_vars, solver):
         """Reconstruct the track order from selected edges."""
         edge_map = {i: j for (i, j) in selected_edges if i != j}
 

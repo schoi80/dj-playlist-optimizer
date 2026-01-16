@@ -1,10 +1,9 @@
 """Integration tests for the playlist optimizer."""
 
-import pytest
 from dj_playlist_optimizer import (
+    HarmonicLevel,
     PlaylistOptimizer,
     Track,
-    HarmonicLevel,
 )
 
 
@@ -71,7 +70,7 @@ class TestPlaylistOptimizerIntegration:
         ]
 
         strict_optimizer = PlaylistOptimizer(harmonic_level=HarmonicLevel.STRICT)
-        strict_result = strict_optimizer.optimize(tracks)
+        _strict_result = strict_optimizer.optimize(tracks)
 
         moderate_optimizer = PlaylistOptimizer(harmonic_level=HarmonicLevel.MODERATE)
         moderate_result = moderate_optimizer.optimize(tracks)
@@ -128,9 +127,7 @@ class TestPlaylistOptimizerIntegration:
         assert result.statistics.harmonic_pct == 100.0
 
     def test_violation_threshold(self):
-        optimizer = PlaylistOptimizer(
-            max_violation_pct=0.0, harmonic_level=HarmonicLevel.STRICT
-        )
+        optimizer = PlaylistOptimizer(max_violation_pct=0.0, harmonic_level=HarmonicLevel.STRICT)
 
         tracks = [
             Track(id="track_1", key="8A", bpm=128),

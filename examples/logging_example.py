@@ -2,7 +2,7 @@
 
 import logging
 
-from dj_playlist_optimizer import PlaylistOptimizer, Track, HarmonicLevel
+from dj_playlist_optimizer import HarmonicLevel, PlaylistOptimizer, Track
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,6 +31,6 @@ for i, track in enumerate(result.playlist, 1):
     print(f"{i}. {track.id} ({track.key}, {track.bpm} BPM)")
 
 if result.statistics:
-    print(f"\nStatistics:")
+    print("\nStatistics:")
     print(f"  Coverage: {result.statistics.coverage_pct:.1f}%")
     print(f"  Harmonic transitions: {result.statistics.harmonic_pct:.1f}%")

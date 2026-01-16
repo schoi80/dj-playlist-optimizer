@@ -40,8 +40,8 @@ def parse_camelot_key(key: str) -> tuple[int, str]:
 
     try:
         hour = int(hour_str)
-    except ValueError:
-        raise ValueError(f"Invalid Camelot key hour: '{hour_str}'")
+    except ValueError as err:
+        raise ValueError(f"Invalid Camelot key hour: '{hour_str}'") from err
 
     if not (1 <= hour <= 12):
         raise ValueError(f"Camelot hour must be 1-12, got: {hour}")
@@ -117,15 +117,10 @@ def is_harmonic_compatible(
     if hour_dist == 1 and not same_letter:
         return True
 
-    if level == HarmonicLevel.RELAXED and hour_dist == 3:
-        return True
-
-    return False
+    return level == HarmonicLevel.RELAXED and hour_dist == 3
 
 
-def get_compatible_keys(
-    key: str, level: HarmonicLevel = HarmonicLevel.STRICT
-) -> list[str]:
+def get_compatible_keys(key: str, level: HarmonicLevel = HarmonicLevel.STRICT) -> list[str]:
     """
     Get all compatible keys for a given Camelot key.
 
@@ -142,12 +137,12 @@ def get_compatible_keys(
         >>> len(get_compatible_keys("8A", HarmonicLevel.MODERATE))
         6
     """
-    hour, letter = parse_camelot_key(key)
+    parse_camelot_key(key)
     compatible = []
 
     for h in range(1, 13):
-        for l in ["A", "B"]:
-            test_key = f"{h}{l}"
+        for letter in ["A", "B"]:
+            test_key = f"{h}{letter}"
             if is_harmonic_compatible(key, test_key, level):
                 compatible.append(test_key)
 

@@ -1,6 +1,5 @@
 """Tests for BPM compatibility with halftime/doubletime support."""
 
-import pytest
 from dj_playlist_optimizer.bpm import bpm_compatible, get_bpm_difference
 
 

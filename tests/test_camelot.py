@@ -1,11 +1,12 @@
 """Tests for Camelot wheel harmonic compatibility logic."""
 
 import pytest
+
 from dj_playlist_optimizer.camelot import (
-    parse_camelot_key,
+    get_compatible_keys,
     get_hour_distance,
     is_harmonic_compatible,
-    get_compatible_keys,
+    parse_camelot_key,
 )
 from dj_playlist_optimizer.models import HarmonicLevel
 
@@ -132,13 +133,13 @@ class TestGetCompatibleKeys:
         assert "5A" in compatible
         assert "11A" in compatible
 
-    def test_edge_case_1A(self):
+    def test_edge_case_1a(self):
         compatible = get_compatible_keys("1A", HarmonicLevel.STRICT)
         assert "12A" in compatible
         assert "2A" in compatible
         assert "1B" in compatible
 
-    def test_edge_case_12B(self):
+    def test_edge_case_12b(self):
         compatible = get_compatible_keys("12B", HarmonicLevel.STRICT)
         assert "11B" in compatible
         assert "1B" in compatible

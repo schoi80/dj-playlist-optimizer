@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List
 
 
 class HarmonicLevel(str, Enum):
@@ -80,8 +79,8 @@ class PlaylistStatistics:
 class PlaylistResult:
     """Result from playlist optimization."""
 
-    playlist: List[Track]
-    transitions: List[TransitionInfo] = field(default_factory=list)
+    playlist: list[Track]
+    transitions: list[TransitionInfo] = field(default_factory=list)
     statistics: PlaylistStatistics | None = None
     solver_status: str = "unknown"
     solver_time_seconds: float = 0.0

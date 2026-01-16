@@ -206,9 +206,7 @@ Examples:
     result = optimizer.optimize(tracks)
 
     if not result.playlist:
-        print(
-            f"No solution found. Solver status: {result.solver_status}", file=sys.stderr
-        )
+        print(f"No solution found. Solver status: {result.solver_status}", file=sys.stderr)
         return 1
 
     print(f"\n✓ Found playlist with {len(result.playlist)} tracks")

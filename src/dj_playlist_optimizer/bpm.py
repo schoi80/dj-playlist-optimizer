@@ -46,10 +46,7 @@ def bpm_compatible(
 
     # Double-time: bpm1 matches double of bpm2
     # Example: 75 BPM matches 150 BPM (75*2 = 150)
-    if abs(bpm1 - bpm2 * 2) <= tolerance:
-        return True
-
-    return False
+    return abs(bpm1 - bpm2 * 2) <= tolerance
 
 
 def get_bpm_difference(bpm1: float, bpm2: float, allow_halftime: bool = True) -> float:
