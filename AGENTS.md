@@ -1,8 +1,6 @@
 # DJ PLAYLIST OPTIMIZER - PROJECT KNOWLEDGE BASE
 
 **Generated:** 2026-01-16
-**Commit:** c523fa1
-**Branch:** main
 
 ## OVERVIEW
 Python library + CLI for optimizing DJ playlists using Google OR-Tools CP-SAT solver. Features harmonic mixing (Camelot Wheel), BPM matching (direct/halftime/doubletime), and Rekordbox integration (DB/XML).
