@@ -5,11 +5,12 @@ import logging
 from ortools.sat.python import cp_model
 
 from djkr8.bpm import bpm_compatible, get_bpm_difference
-from djkr8.camelot import is_harmonic_compatible
+from djkr8.camelot import get_transition_quality, is_energy_boost, is_harmonic_compatible
 from djkr8.models import (
     HarmonicLevel,
     PlaylistResult,
     PlaylistStatistics,
+    SetArcProfile,
     Track,
     TransitionInfo,
 )
@@ -36,6 +37,9 @@ class PlaylistOptimizer:
         max_playlist_duration: float | None = None,
         energy_weight: float = 0.0,
         enforce_energy_flow: bool = True,
+        max_energy_boosts: int = 3,
+        transition_quality_weight: float = 10.0,
+        arc_profile: SetArcProfile = SetArcProfile.NONE,
     ):
         self.bpm_tolerance = bpm_tolerance
         self.allow_halftime_bpm = allow_halftime_bpm
@@ -45,6 +49,9 @@ class PlaylistOptimizer:
         self.max_playlist_duration = max_playlist_duration
         self.energy_weight = energy_weight
         self.enforce_energy_flow = enforce_energy_flow
+        self.max_energy_boosts = max_energy_boosts
+        self.transition_quality_weight = transition_quality_weight
+        self.arc_profile = arc_profile
 
     def optimize(
         self,
@@ -138,13 +145,16 @@ class PlaylistOptimizer:
 
         edge_vars = {}
 
+        def is_energy_flow_valid(i: int, j: int) -> bool:
+            return j >= i and j - i <= 1
+
         # 1. Edges between real tracks
         for i in range(num_tracks):
             for j in range(num_tracks):
                 # Constraints:
                 # 1. Different tracks
                 # 2. BPM compatible
-                # 3. Energy must be non-decreasing (next >= current) if enforced
+                # 3. Energy flow valid (non-decreasing, max +1) if enforced
                 if (
                     i != j
                     and bpm_compatible(
@@ -153,7 +163,10 @@ class PlaylistOptimizer:
                         self.bpm_tolerance,
                         self.allow_halftime_bpm,
                     )
-                    and (not self.enforce_energy_flow or tracks[j].energy >= tracks[i].energy)
+                    and (
+                        not self.enforce_energy_flow
+                        or is_energy_flow_valid(tracks[i].energy, tracks[j].energy)
+                    )
                 ):
                     edge_vars[(i, j)] = model.new_bool_var(f"edge_{i}_{j}")
 
@@ -203,18 +216,35 @@ class PlaylistOptimizer:
             target = min(target_length, num_tracks)
             model.add(sum(included) == target + 1)
 
-        # Harmonic violations (only for track-track edges, not dummy edges)
+        # Harmonic violations and energy boosts (only for track-track edges, not dummy edges)
         violation_vars = {}
+        boost_vars = {}
+        quality_scores = {}
+
         for (i, j), edge_var in edge_vars.items():
-            # Skip dummy edges
             if i == dummy_idx or j == dummy_idx:
                 continue
 
-            if not is_harmonic_compatible(tracks[i].key, tracks[j].key, self.harmonic_level):
+            quality, _ = get_transition_quality(tracks[i].key, tracks[j].key)
+            quality_scores[(i, j)] = quality
+
+            is_boost = is_energy_boost(tracks[i].key, tracks[j].key)
+            if is_boost:
+                boost_var = model.new_bool_var(f"boost_{i}_{j}")
+                model.add(edge_var == 1).only_enforce_if(boost_var)
+                model.add(edge_var == 0).only_enforce_if(boost_var.Not())
+                boost_vars[(i, j)] = boost_var
+            elif not is_harmonic_compatible(tracks[i].key, tracks[j].key, self.harmonic_level):
                 violation = model.new_bool_var(f"viol_{i}_{j}")
                 model.add(edge_var == 1).only_enforce_if(violation)
                 model.add(edge_var == 0).only_enforce_if(violation.Not())
                 violation_vars[(i, j)] = violation
+
+        if boost_vars:
+            model.add(sum(boost_vars.values()) <= self.max_energy_boosts)
+            logger.debug(
+                f"Found {len(boost_vars)} energy boost edges, max allowed: {self.max_energy_boosts}"
+            )
 
         # Max violations constraint
         if violation_vars:
@@ -254,15 +284,21 @@ class PlaylistOptimizer:
         for i in range(num_tracks):
             weight = base_weight
 
-            # Add energy weight if configured
             if self.energy_weight > 0:
                 weight += int(self.energy_weight * tracks[i].energy)
 
-            # Add must_include bonus
             if i in must_include_indices:
                 weight += must_include_weight
 
             objective_terms.append(weight * included[i])
+
+        for (i, j), edge_var in edge_vars.items():
+            if i == dummy_idx or j == dummy_idx:
+                continue
+
+            if (i, j) in quality_scores:
+                quality_bonus = int(self.transition_quality_weight * quality_scores[(i, j)] * 100)
+                objective_terms.append(quality_bonus * edge_var)
 
         model.maximize(sum(objective_terms))
 
@@ -277,7 +313,15 @@ class PlaylistOptimizer:
 
         if status in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
             result = self._extract_result(
-                solver, tracks, included, edge_vars, violation_vars, status, dummy_idx
+                solver,
+                tracks,
+                included,
+                edge_vars,
+                violation_vars,
+                boost_vars,
+                quality_scores,
+                status,
+                dummy_idx,
             )
             if result.statistics:
                 logger.info(
@@ -301,6 +345,8 @@ class PlaylistOptimizer:
         included,
         edge_vars,
         violation_vars,
+        boost_vars,
+        quality_scores,
         status,
         dummy_idx: int,
     ) -> PlaylistResult:
@@ -322,7 +368,13 @@ class PlaylistOptimizer:
 
         # Reconstruct path using dummy node logic
         playlist, transitions = self._reconstruct_path_with_dummy(
-            tracks, selected_edges, dummy_idx, self.harmonic_level, self.allow_halftime_bpm
+            tracks,
+            selected_edges,
+            dummy_idx,
+            self.harmonic_level,
+            self.allow_halftime_bpm,
+            quality_scores,
+            boost_vars,
         )
 
         harmonic = sum(1 for t in transitions if t.is_harmonic)
@@ -350,10 +402,15 @@ class PlaylistOptimizer:
         )
 
     def _reconstruct_path_with_dummy(
-        self, tracks, selected_edges, dummy_idx, harmonic_level, allow_halftime
+        self,
+        tracks,
+        selected_edges,
+        dummy_idx,
+        harmonic_level,
+        allow_halftime,
+        quality_scores,
+        boost_vars,
     ):
-        """Reconstruct the path starting from dummy node."""
-        # Find start: dummy -> start_node
         start_node = None
         for i, j in selected_edges:
             if i == dummy_idx:
@@ -367,11 +424,9 @@ class PlaylistOptimizer:
         transitions = []
 
         current = start_node
-        # Traverse until we hit dummy again (end of path)
         while current != dummy_idx:
             playlist.append(tracks[current])
 
-            # Find next node
             next_node = None
             for i, j in selected_edges:
                 if i == current:
@@ -381,15 +436,17 @@ class PlaylistOptimizer:
             if next_node is None:
                 break
 
-            # If next is dummy, we are done with transitions
             if next_node != dummy_idx:
-                # Calculate transition info
                 is_harmonic = is_harmonic_compatible(
                     tracks[current].key, tracks[next_node].key, harmonic_level
                 )
 
                 bpm_diff = get_bpm_difference(
                     tracks[current].bpm, tracks[next_node].bpm, allow_halftime
+                )
+
+                quality, transition_type = get_transition_quality(
+                    tracks[current].key, tracks[next_node].key
                 )
 
                 transitions.append(
@@ -399,6 +456,8 @@ class PlaylistOptimizer:
                         is_harmonic=is_harmonic,
                         is_bpm_compatible=True,
                         bpm_difference=bpm_diff,
+                        transition_type=transition_type,
+                        quality_score=quality,
                     )
                 )
 
